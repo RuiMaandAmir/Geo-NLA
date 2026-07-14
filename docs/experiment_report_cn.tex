@@ -1,8 +1,7 @@
-\documentclass[a4paper,11pt]{ctexart}
+\documentclass[a4paper,11pt]{article}
 
 % Packages
-\usepackage[utf8]{inputenc}
-\usepackage{mathptmx}
+\usepackage{fontspec}
 \usepackage[margin=2.5cm]{geometry}
 \usepackage{graphicx}
 \usepackage{amsmath,amssymb}
@@ -13,6 +12,19 @@
 \usepackage{float}
 \usepackage{caption}
 \usepackage{enumitem}
+
+% Chinese font setup - use Noto Serif CJK SC as main font
+\setmainfont{Noto Serif CJK SC}
+\setsansfont{Noto Sans CJK SC}
+\setmonofont{Noto Sans Mono CJK SC}
+
+% Chinese captions and section titles
+\renewcommand{\abstractname}{摘要}
+\renewcommand{\refname}{参考文献}
+\renewcommand{\contentsname}{目录}
+\renewcommand{\figurename}{图}
+\renewcommand{\tablename}{表}
+\renewcommand{\today}{2026年}
 
 % Hyperlink setup
 \definecolor{darkblue}{rgb}{0.1,0.1,0.5}
