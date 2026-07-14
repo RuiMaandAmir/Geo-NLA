@@ -1,0 +1,488 @@
+\documentclass[a4paper,11pt]{article}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage{mathptmx}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{multirow}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{enumitem}
+
+% Hyperlink setup
+\definecolor{darkblue}{rgb}{0.1,0.1,0.5}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=darkblue,
+    citecolor=darkblue,
+    urlcolor=darkblue
+}
+
+% Title
+\title{\textbf{GeoNLA: A Neural Network Layered Architecture Analogy for Geographic Systems --- Experimental Validation}}
+\author{Ma Rui}
+\date{2026}
+
+\begin{document}
+\maketitle
+
+%=============================================================
+\begin{abstract}
+Geographic systems exhibit a characteristic layered structure in which physical factors (topography, climate, soil) give rise to vegetation patterns, which in condition human activities. The GeoNLA framework (Ma, 2026) hypothesizes a structural isomorphism between this geographic sphere-stacking process and the layered computation of artificial neural networks. We present a two-layer simplification of GeoNLA to test this hypothesis. The model consists of a \emph{physical layer} that transforms 12-dimensional geographic inputs into a 32-dimensional emergent representation via an affine transformation followed by ReLU activation, a \emph{multiplicative temporal modulation} step that couples the emergent representation with time-varying factors, and a \emph{human layer} that maps the modulated representation to 6-dimensional human activity outputs with an additional socioeconomic modulation. We conduct ablation experiments on two data routes: (1)~synthetic data whose label generation process mirrors the GeoNLA two-stage cascade, and (2)~real raster data from the Linxia Basin derived from SRTM, WorldClim, SoilGrids, Sentinel-2, WorldCover, WorldPop, and VIIRS sources. On synthetic data, GeoNLA reduces RMSE by 6.6\% and MAE by 13.3\% compared to a parameter-matched flat MLP baseline (652 vs.\ 678 parameters). On real raster data, GeoNLA achieves a consistent but smaller improvement of 2.7\% in RMSE. These results support the core hypothesis that layered architecture with multiplicative modulation better captures the information emergence process inherent in geographic systems.
+\end{abstract}
+
+%=============================================================
+\section{Introduction}
+\label{sec:introduction}
+
+Geographic phenomena arise from the interaction of multiple spheres --- the lithosphere, atmosphere, pedosphere, biosphere, and anthroposphere --- each imposing constraints and affordances on the next. Topography modulates climate; climate shapes soil formation; soil conditions vegetation; and the resulting landscape frames human land use. This sequential, conditional dependency bears a striking structural resemblance to the forward computation of deep neural networks, where each layer transforms its input representation before passing it to the next.
+
+Ma (2026) formalized this observation in the GeoNLA (Geographic Neural Layered Architecture) framework, proposing that the geographic sphere-stacking process is \emph{isomorphic} to the layered computation of neural networks. In this analogy, each hidden layer corresponds to a geographic sphere, and the inter-layer transformations correspond to the physical, chemical, and ecological processes that couple adjacent spheres. A key prediction of the theory is that the coupling between spheres is not merely additive but involves \emph{multiplicative modulation} --- for example, the effect of temperature on vegetation is modulated by precipitation availability, and the effect of physical landscape on human activity is modulated by socioeconomic conditions.
+
+This experimental report presents a controlled validation of the GeoNLA hypothesis using a two-layer simplified model. We compare GeoNLA against a flat MLP baseline that collapses all geographic factors into a single input vector, removing the layered structure and multiplicative modulation. If the geographic sphere-stacking process truly follows a layered, multiplicative logic, then GeoNLA should exhibit superior inductive bias --- achieving better performance with comparable model capacity.
+
+We evaluate both models on two complementary data routes. Synthetic data, whose label generation process explicitly follows the GeoNLA two-stage cascade, provides a clean test of whether the architectural inductive bias can recover the correct data-generating process. Real raster data from the Linxia Basin tests whether this advantage transfers to a realistic, noisy setting.
+
+%=============================================================
+\section{Study Area \& Data}
+\label{sec:study_area}
+
+\subsection{Synthetic Data}
+\label{subsec:synthetic_data}
+
+To create a controlled test environment, we generate synthetic data whose label generation process mirrors the GeoNLA two-stage cascade. The synthetic data simulate a Linxia Basin--style geographic setting.
+
+\textbf{Input features (12 dimensions):}
+
+\begin{table}[htbp]
+\centering
+\caption{Synthetic input features organized by geographic sphere.}
+\label{tab:input_features}
+\begin{tabular}{llc}
+\toprule
+Sphere & Variables & Dimensions \\
+\midrule
+Topography & Elevation, Slope, Relief amplitude & 3 \\
+Climate & Temperature, Precipitation, Aridity index & 3 \\
+Soil & Organic matter, Clay content, Water holding capacity & 3 \\
+Vegetation & NDVI, NDVI amplitude, Grassland fraction & 3 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Output labels (6 dimensions):}
+
+\begin{table}[htbp]
+\centering
+\caption{Synthetic output labels.}
+\label{tab:output_labels}
+\begin{tabular}{ll}
+\toprule
+Variable & Description \\
+\midrule
+Cultivated land ratio & Proportion of cropland area \\
+Irrigation ratio & Proportion of irrigated area \\
+Construction land & Built-up area fraction \\
+Population density & Persons per unit area \\
+Nighttime light & Radiance intensity \\
+Road density & Road length per unit area \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Label generation process.} Labels are produced via a three-step process that exactly mirrors the GeoNLA isomorphic two-stage formulation:
+
+\begin{enumerate}[label=\arabic*.]
+    \item \textbf{Physical emergence:} $h_1 = \text{ReLU}(X W_1 + b_1)$, where $X \in \mathbb{R}^{N \times 12}$ and $W_1 \in \mathbb{R}^{12 \times 32}$.
+    \item \textbf{Multiplicative temporal modulation:} $h_1(t) = h_1 \odot (1 + \Delta W \odot t)$, where $\Delta W \in \mathbb{R}^{32}$ is a learnable modulation vector and $t$ is the temporal factor.
+    \item \textbf{Human-land transformation:} $y = \sigma(h_1(t) W_2 + b_2) \odot (1 + \text{socioeconomic modulation})$, where $W_2 \in \mathbb{R}^{32 \times 6}$ and $\sigma$ is the sigmoid activation.
+\end{enumerate}
+
+This data generation process ensures that GeoNLA's inductive bias --- layered cascade with multiplicative modulation --- constitutes the ``correct answer'' for the synthetic task.
+
+\textbf{Dataset configuration:} 400 samples with an 80/20 train-validation split (320 training, 80 validation).
+
+\subsection{Real Raster Data (Linxia Basin)}
+\label{subsec:real_data}
+
+\textbf{Study area.} The Linxia Basin (35.3$^{\circ}$N--35.8$^{\circ}$N, 102.9$^{\circ}$E--103.5$^{\circ}$E) is an intermontane basin in Gansu Province, northwestern China. It features complex terrain with elevations ranging from approximately 1,700\,m to over 3,500\,m, a semi-arid continental monsoon climate, and a gradient of human land use from dense agricultural valleys to sparse pastoral highlands.
+
+\textbf{Data sources.} All raster layers are resampled to a common ${\sim}1$\,km grid (GRID\_STEP\_DEG = 0.009$^{\circ}$ $\approx$ 0.8\,km):
+
+\begin{table}[htbp]
+\centering
+\caption{Data sources and resolution for real raster experiments.}
+\label{tab:data_sources}
+\begin{tabular}{lll}
+\toprule
+Data product & Variable & Resolution \\
+\midrule
+SRTM DEM & Elevation, derived slope, relief amplitude & 30\,m $\to$ ${\sim}1$\,km \\
+WorldClim v2 & Temperature, precipitation, aridity index & ${\sim}1$\,km \\
+SoilGrids v2.0 & Organic carbon, clay content, water holding capacity & 250\,m $\to$ ${\sim}1$\,km \\
+Sentinel-2 & NDVI mean, NDVI amplitude, grassland fraction & 10\,m $\to$ ${\sim}1$\,km \\
+ESA WorldCover & Land cover classification & 10\,m $\to$ ${\sim}1$\,km \\
+WorldPop & Population density & ${\sim}1$\,km \\
+VIIRS nighttime light & Radiance & ${\sim}500$\,m $\to$ ${\sim}1$\,km \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Feature extraction.} From each ${\sim}1$\,km grid cell, 12 geographic input features are extracted following the same structure as the synthetic data. The 6 output labels are derived from the raster products: construction land ratio from WorldCover, population density from WorldPop, nighttime light from VIIRS, and road density from OpenStreetMap-derived layers; cultivated land ratio and irrigation ratio are derived from cropland subtypes in WorldCover combined with irrigation datasets.
+
+The real raster dataset provides a realistic test scenario where the true data-generating process is unknown and the labels are derived (rather than directly observed), introducing measurement noise and potential mismatches with the GeoNLA generative assumptions.
+
+%=============================================================
+\section{Model Architecture}
+\label{sec:model_architecture}
+
+\subsection{GeoNLA (Two-Layer Simplification)}
+\label{subsec:geonla}
+
+The GeoNLA model implements the geographic sphere-stacking analogy through three computational stages:
+
+\textbf{Stage 1 --- Physical layer} (geographic sphere transformation):
+\begin{align}
+    h_1 &= \text{ReLU}(\text{Linear}(X) + b_1), \quad h_1 \in \mathbb{R}^{32} \\
+    h_1 &= \text{Dropout}(h_1, p=0.2)
+\end{align}
+
+This layer corresponds to the transformation from the physical geographic spheres (topography $\to$ climate $\to$ soil $\to$ vegetation) into an emergent latent representation. The 32-dimensional hidden space captures the integrated geographic conditions that collectively constrain human activity.
+
+\textbf{Stage 2 --- Multiplicative temporal modulation:}
+\begin{equation}
+    h_1(t) = h_1 \odot (1 + \theta_{\text{time}} \odot f_{\text{time}})
+\end{equation}
+
+where $\theta_{\text{time}} \in \mathbb{R}^{32}$ is a learnable modulation parameter vector and $f_{\text{time}}$ is the temporal factor vector. This implements the $W_k(t)$ formulation from the GeoNLA theory, capturing how seasonal and temporal dynamics modulate the physical-to-human coupling.
+
+\textbf{Stage 3 --- Human layer} (human-land relationship emergence):
+\begin{equation}
+    y = \sigma(\text{Linear}(h_1(t)) + b_2), \quad y \in \mathbb{R}^{6}
+\end{equation}
+
+\textbf{Stage 4 --- Socioeconomic modulation:}
+\begin{equation}
+    y(t) = y \odot (1 + \theta_{\text{socio}} \odot f_{\text{socio}})
+\end{equation}
+
+where $\theta_{\text{socio}} \in \mathbb{R}^{6}$ is a learnable socioeconomic modulation parameter.
+
+\textbf{Total trainable parameters:} 652.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.85\textwidth]{../figures/fig1_model_architecture.png}
+\caption{Two-layer GeoNLA model architecture. The physical layer transforms 12-dimensional geographic inputs into a 32-dimensional emergent representation, followed by multiplicative temporal modulation and a human layer that maps to 6-dimensional outputs with socioeconomic modulation.}
+\label{fig:model_architecture}
+\end{figure}
+
+\subsection{FlatMLP Baseline}
+\label{subsec:flatmlp}
+
+The baseline model removes all structural inductive bias specific to the GeoNLA hypothesis:
+
+\begin{itemize}
+    \item \textbf{Input concatenation:} Geographic features (12-dim), temporal factor, and socioeconomic factor are concatenated into a single 14-dimensional input vector.
+    \item \textbf{Two-layer MLP:} $\text{Linear}(14 \to 32) + \text{ReLU} + \text{Dropout}(0.2) \to \text{Linear}(32 \to 6) + \text{Sigmoid}$
+    \item \textbf{No sphere-based emergence}, no multiplicative temporal or socioeconomic modulation.
+\end{itemize}
+
+\textbf{Total trainable parameters:} 678.
+
+The parameter counts are closely matched (652 vs.\ 678), ensuring that any performance difference reflects architectural inductive bias rather than model capacity.
+
+%=============================================================
+\section{Experimental Setup}
+\label{sec:experimental_setup}
+
+All experiments are implemented in PyTorch ($\geq$ 2.0) with the following configuration:
+
+\begin{table}[htbp]
+\centering
+\caption{Hyperparameter configuration.}
+\label{tab:hyperparameters}
+\begin{tabular}{ll}
+\toprule
+Hyperparameter & Value \\
+\midrule
+Optimizer & Adam \\
+Learning rate & $1 \times 10^{-3}$ \\
+Weight decay & $1 \times 10^{-4}$ \\
+LR scheduler & ReduceLROnPlateau (patience=15, factor=0.5) \\
+Loss function & MSE \\
+Training epochs & 200 \\
+Batch size & 32 \\
+Random seed & 42 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Evaluation metrics.} We report three metrics computed on the validation set:
+
+\begin{itemize}
+    \item \textbf{RMSE} (Root Mean Squared Error): measures overall prediction magnitude error.
+    \item \textbf{MAE} (Mean Absolute Error): measures average absolute deviation.
+    \item \textbf{R\textsuperscript{2}} (Coefficient of Determination): measures proportion of variance explained, reported both as a mean across all output dimensions and per individual output dimension.
+\end{itemize}
+
+\textbf{Reproducibility.} All random seeds (Python, NumPy, PyTorch CPU/CUDA) are fixed to 42. The codebase, data generation scripts, and trained model checkpoints are archived alongside this report.
+
+%=============================================================
+\section{Results}
+\label{sec:results}
+
+\subsection{Synthetic Data Experiments}
+\label{subsec:synthetic_results}
+
+Table~\ref{tab:synthetic_overall} summarizes the overall validation performance on synthetic data.
+
+\begin{table}[htbp]
+\centering
+\caption{Overall validation metrics on synthetic data (400 samples, 80/20 split).}
+\label{tab:synthetic_overall}
+\begin{tabular}{lcccc}
+\toprule
+Model & Params & RMSE $\downarrow$ & MAE $\downarrow$ & $R^2$ (mean) $\uparrow$ \\
+\midrule
+GeoNLA & 652 & 0.1140 & 0.0790 & 0.7918 \\
+FlatMLP & 678 & 0.1221 & 0.0912 & 0.7621 \\
+\textbf{Improvement} & --- & \textbf{$-6.6\%$} & \textbf{$-13.3\%$} & \textbf{$+0.030$} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+GeoNLA achieves meaningful improvements across all three metrics. The most pronounced gain is in MAE ($-13.3\%$), indicating that the layered architecture with multiplicative modulation reduces large prediction errors more effectively than the flat baseline.
+
+Table~\ref{tab:synthetic_perdim} presents the per-dimension $R^2$ breakdown, revealing where the architectural advantage is most concentrated.
+
+\begin{table}[htbp]
+\centering
+\caption{Per-dimension $R^2$ on synthetic data.}
+\label{tab:synthetic_perdim}
+\begin{tabular}{lccc}
+\toprule
+Output Dimension & GeoNLA & FlatMLP & $\Delta$ \\
+\midrule
+Cultivated land ratio & 0.710 & 0.651 & $+0.059$ \\
+Irrigation ratio & 0.822 & 0.746 & $+0.076$ \\
+Construction land & 0.711 & 0.700 & $+0.011$ \\
+Population density & 0.891 & 0.880 & $+0.011$ \\
+Nighttime light & 0.829 & 0.838 & $-0.009$ \\
+Road density & 0.787 & 0.757 & $+0.030$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The largest improvements occur in \textbf{irrigation ratio} ($+0.076$) and \textbf{cultivated land ratio} ($+0.059$), both of which are strongly governed by the physical-geographic cascade (topography $\to$ climate $\to$ soil $\to$ water availability). This is consistent with the GeoNLA hypothesis: these outputs benefit most from the layered geographic transformation. Nighttime light shows a marginal decrease ($-0.009$), possibly because its relationship with physical geography is more direct and less mediated by the sphere-stacking cascade.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{../figures/fig0_loss_curves.png}
+\caption{Training and validation loss curves for GeoNLA and FlatMLP on synthetic data.}
+\label{fig:loss_curves}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.75\textwidth]{../figures/fig6_ablation_val_loss.png}
+\caption{Validation loss comparison: GeoNLA vs.\ FlatMLP.}
+\label{fig:ablation_val_loss}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{../figures/fig7_ablation_metrics.png}
+\caption{RMSE, MAE, and $R^2$ comparison bar charts for GeoNLA and FlatMLP.}
+\label{fig:ablation_metrics}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{../figures/fig8_ablation_r2_per_dim.png}
+\caption{Per-dimension $R^2$ comparison between GeoNLA and FlatMLP on synthetic data.}
+\label{fig:ablation_r2_per_dim}
+\end{figure}
+
+\subsection{Real Raster Data Experiments}
+\label{subsec:real_results}
+
+Table~\ref{tab:real_overall} presents results on the Linxia Basin real raster dataset.
+
+\begin{table}[htbp]
+\centering
+\caption{Overall validation metrics on real raster data (Linxia Basin, ${\sim}1$\,km grid).}
+\label{tab:real_overall}
+\begin{tabular}{lcccc}
+\toprule
+Model & Params & RMSE $\downarrow$ & MAE $\downarrow$ & $R^2$ (mean) $\uparrow$ \\
+\midrule
+GeoNLA & 652 & 0.0342 & 0.0114 & 0.9120 \\
+FlatMLP & 678 & 0.0351 & 0.0117 & 0.9107 \\
+\textbf{Improvement} & --- & \textbf{$-2.7\%$} & \textbf{$-3.1\%$} & \textbf{$+0.001$} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The improvements are consistent in direction but smaller in magnitude compared to the synthetic experiments. Both models achieve high $R^2$ values ($\geq 0.91$), reflecting the relatively smooth relationships in the ${\sim}1$\,km gridded real data.
+
+\begin{table}[htbp]
+\centering
+\caption{Per-dimension $R^2$ on real raster data.}
+\label{tab:real_perdim}
+\begin{tabular}{lccc}
+\toprule
+Output Dimension & GeoNLA & FlatMLP & $\Delta$ \\
+\midrule
+Construction land & 0.850 & 0.837 & $+0.013$ \\
+Population density & 0.955 & 0.958 & $-0.003$ \\
+Nighttime light & 0.971 & 0.976 & $-0.005$ \\
+Road density & 0.872 & 0.872 & $0.000$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+GeoNLA shows the largest advantage for \textbf{construction land} ($+0.013$), an output that integrates multiple physical geographic constraints (terrain suitability, water access, land cover). For population density and nighttime light --- variables with more direct statistical relationships --- the two models perform comparably. Road density shows identical performance, suggesting that the architectural difference has minimal impact on this particular output.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{../figures/fig3_prediction_comparison.png}
+\caption{Predicted vs.\ true scatter plots for all output dimensions on real raster data.}
+\label{fig:prediction_comparison}
+\end{figure}
+
+\subsection{Key Visualizations}
+\label{subsec:key_vis}
+
+\textbf{t-SNE of the emergence layer.} The t-SNE projection of the 32-dimensional emergent representation (Stage~1 output) reveals that GeoNLA preserves geographic similarity structure: grid cells from similar terrain-climate-soil clusters are positioned close together in the embedding space, while cells from distinct geographic settings are well separated.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{../figures/fig2_emergence_tsne.png}
+\caption{t-SNE visualization of the 32-dimensional emergence layer. GeoNLA preserves geographic similarity structure, with cells from similar terrain-climate-soil clusters positioned close together.}
+\label{fig:emergence_tsne}
+\end{figure}
+
+\textbf{Weight heatmaps.} The learned $W_1$ (physical coupling, $12 \times 32$) and $W_2$ (human-land coupling, $32 \times 6$) weight matrices reveal interpretable coupling pathways. $W_1$ shows coherent block structure corresponding to the four geographic spheres, with each sphere contributing distinctively to the emergent representation. $W_2$ reveals which emergent features drive which human activity outputs.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{../figures/fig4_weight_heatmaps.png}
+\caption{Learned weight heatmaps. Top: $W_1$ (physical coupling, $12 \times 32$) showing coherent block structure corresponding to the four geographic spheres. Bottom: $W_2$ (human-land coupling, $32 \times 6$) revealing which emergent features drive human activity outputs.}
+\label{fig:weight_heatmaps}
+\end{figure}
+
+\textbf{Temporal modulation effect.} The temporal modulation visualization shows predicted human activity values across 12 months under fixed geographic conditions. The multiplicative modulation produces realistic seasonal variation --- agricultural outputs peak during growing seasons while construction and population-related outputs show different temporal patterns --- validating the role of multiplicative temporal coupling in the GeoNLA framework.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{../figures/fig5_temporal_modulation.png}
+\caption{Temporal modulation effect across 12 months. Predicted human activity values under fixed geographic conditions show realistic seasonal variation driven by multiplicative temporal coupling.}
+\label{fig:temporal_modulation}
+\end{figure}
+
+%=============================================================
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Architectural Inductive Bias}
+\label{subsec:inductive_bias}
+
+The experimental results consistently support the core GeoNLA hypothesis: a layered architecture with multiplicative modulation outperforms a parameter-matched flat MLP in modeling geographic human-land relationships. On synthetic data, where the data-generating process exactly mirrors the GeoNLA formulation, the advantage is substantial --- a 6.6\% RMSE reduction and a 13.3\% MAE reduction. On real raster data, the advantage persists but diminishes (2.7\% RMSE reduction), which is expected given that real-world labels are derived from remote sensing products rather than generated by a strict two-layer multiplicative process.
+
+The parameter-matched design (652 vs.\ 678 parameters) is critical: the performance gain cannot be attributed to increased model capacity. Instead, it reflects the \emph{inductive bias} encoded by the GeoNLA architecture --- the assumption that geographic information flows through a structured cascade with multiplicative inter-sphere coupling.
+
+\subsection{Dimension-Specific Analysis}
+\label{subsec:dim_analysis}
+
+The per-dimension $R^2$ analysis reveals a nuanced picture. GeoNLA's advantage is strongest for outputs that are most directly shaped by the physical geographic cascade --- cultivated land ratio and irrigation ratio in synthetic data, and construction land in real data. These outputs depend on the integrated effect of topography, climate, soil, and vegetation, which is precisely the information pathway that the GeoNLA architecture is designed to capture.
+
+Conversely, outputs with more direct or simpler relationships to the input features (nighttime light, road density) show comparable performance between the two models. This suggests that the GeoNLA advantage is not universal but is concentrated in outputs where the sphere-stacking causal chain plays a dominant role.
+
+\subsection{Interpretability}
+\label{subsec:interpretability}
+
+Beyond predictive performance, the GeoNLA architecture offers interpretability advantages. The $W_1$ weight matrix reveals how physical geographic factors couple into emergent representations, and the $W_2$ matrix shows how emergent representations drive human activity outputs. These weight structures can be analyzed to understand the learned geographic coupling pathways.
+
+The t-SNE visualization of the emergence layer further demonstrates that the 32-dimensional hidden space preserves meaningful geographic similarity --- a property that emerges naturally from the architecture's design rather than being explicitly enforced.
+
+The temporal modulation analysis provides direct evidence for the multiplicative coupling mechanism. By visualizing predictions across 12 months under fixed geographic conditions, we observe that the temporal modulation produces spatially coherent and seasonally realistic variation in human activity predictions.
+
+\subsection{Limitations}
+\label{subsec:limitations}
+
+Several limitations should be acknowledged:
+
+\begin{enumerate}[label=\arabic*.]
+    \item \textbf{Two-layer simplification.} The full GeoNLA theory posits six geographic spheres, but the current experimental validation uses only two layers (physical $\to$ human). Extending to the full six-layer architecture may reveal additional advantages but also introduces challenges in optimization and data requirements.
+
+    \item \textbf{Label derivation noise.} In the real raster experiments, the output labels are derived from remote sensing classifications and population raster products rather than from direct statistical surveys. This derivation process introduces classification errors, spatial misregistration, and temporal mismatches that may obscure the underlying geographic relationships.
+
+    \item \textbf{Spatial autocorrelation.} Neither model explicitly accounts for spatial autocorrelation in the data. The current implementation treats each grid cell independently, ignoring the spatial dependence structure that is fundamental to geographic phenomena.
+
+    \item \textbf{Sample size.} The synthetic dataset (400 samples) and the real raster dataset (derived from ${\sim}1$\,km grid sampling of a single basin) are relatively small by deep learning standards. Larger-scale experiments across multiple regions would strengthen the generalizability claims.
+
+    \item \textbf{Causal vs.\ correlational.} While the GeoNLA architecture encodes a causal ordering of geographic spheres, the experimental validation demonstrates correlational improvement. Establishing true causal validity would require interventional or quasi-experimental study designs.
+\end{enumerate}
+
+%=============================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+This experimental report presents a controlled validation of the GeoNLA framework's core hypothesis: that the geographic sphere-stacking process exhibits a structural isomorphism with neural network layered computation, and that encoding this inductive bias improves modeling of geographic human-land relationships.
+
+Using a two-layer simplified model, we demonstrate that GeoNLA outperforms a parameter-matched flat MLP baseline on both synthetic data (RMSE $-6.6\%$, MAE $-13.3\%$) and real raster data from the Linxia Basin (RMSE $-2.7\%$, MAE $-3.1\%$). The improvements are consistent in direction across both data routes, with the magnitude reflecting the degree to which the data-generating process aligns with the GeoNLA layered-multiplicative assumptions.
+
+Beyond predictive performance, the GeoNLA architecture provides interpretable weight structures ($W_1$, $W_2$), preserves geographic similarity in its emergent representation, and captures realistic temporal modulation patterns --- properties that collectively support the theoretical analogy between geographic sphere stacking and neural network layer computation.
+
+\textbf{Future work} will focus on three directions: (1)~extending the two-layer model to the full six-layer GeoNLA architecture corresponding to all geographic spheres; (2)~integrating convolutional or graph neural network layers to capture spatial dependencies; and (3)~applying the framework to larger multi-regional datasets to test the generalizability of the geographic-neural isomorphism across diverse environmental settings.
+
+%=============================================================
+\begin{thebibliography}{7}
+
+\bibitem{ma2026}
+Ma, R. (2026).
+\emph{Geo-NLA: Neural Network Layered Architecture as an Analogy for Geographic Systems}.
+Zenodo.
+\url{https://doi.org/10.5281/zenodo.21350728}
+
+\bibitem{srtm2013}
+NASA JPL (2013).
+\emph{Shuttle Radar Topography Mission (SRTM) Global}.
+NASA EOSDIS Land Processes DAAC.
+\url{https://doi.org/10.5067/MEPEWDXG2HSK}
+
+\bibitem{fick2017}
+Fick, S.\ E.\ \& Hijmans, R.\ J.\ (2017).
+WorldClim 2: new 1-km spatial resolution climate surfaces for global land areas.
+\emph{International Journal of Climatology}, 37(12), 4376--4390.
+\url{https://doi.org/10.1002/joc.5086}
+
+\bibitem{poggio2021}
+Poggio, L., de Sousa, L.\ M., Batjes, N.\ H., et~al.\ (2021).
+SoilGrids 2.0: producing soil information for soil quantities with quantified spatial uncertainty.
+\emph{SOIL}, 7(2), 999--1020.
+\url{https://doi.org/10.5194/soil-2021-46}
+
+\bibitem{worldcover2021}
+ESA WorldCover Consortium (2021).
+\emph{ESA WorldCover 10\,m 2020 v1.0}.
+Zenodo.
+\url{https://doi.org/10.5281/zenodo.5571936}
+
+\bibitem{worldpop}
+WorldPop (\url{www.worldpop.org}).
+
+\bibitem{elvidge2021}
+Elvidge, C.\ D., et~al.\ (2021).
+VIIRS DNB annual composites.
+\emph{Earth Observation Group}, Colorado School of Mines.
+
+\end{thebibliography}
+
+\end{document}

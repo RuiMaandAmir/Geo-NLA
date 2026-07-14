@@ -1,0 +1,50 @@
+{
+  "source": "raster",
+  "models": {
+    "geonla": {
+      "best_val_loss": 0.0011678209262900054,
+      "n_params": 652,
+      "metrics": {
+        "mse": 0.001167820766568184,
+        "rmse": 0.03417339266985624,
+        "mae": 0.01135245617479086,
+        "r2_mean": 0.9120266288518906,
+        "r2_per_dim": [
+          null,
+          null,
+          0.8497968316078186,
+          0.9550544619560242,
+          0.9710481762886047,
+          0.8722070455551147
+        ]
+      },
+      "checkpoint": "G:\\GeoAI\\geonla_demo\\outputs\\geonla_checkpoint.pth"
+    },
+    "flatmlp": {
+      "best_val_loss": 0.001233878046274185,
+      "n_params": 678,
+      "metrics": {
+        "mse": 0.0012338780798017979,
+        "rmse": 0.0351266007436216,
+        "mae": 0.011714613065123558,
+        "r2_mean": 0.9106702208518982,
+        "r2_per_dim": [
+          null,
+          null,
+          0.8368540406227112,
+          0.9576237201690674,
+          0.976375162601471,
+          0.8718279600143433
+        ]
+      },
+      "checkpoint": "G:\\GeoAI\\geonla_demo\\outputs\\flatmlp_checkpoint.pth"
+    }
+  },
+  "geonla_vs_flatmlp": {
+    "rmse_improve_pct": 2.7136359726220194,
+    "mae_improve_pct": 3.091496819301595,
+    "r2_improve_abs": 0.0013564079999923706,
+    "mse_improve_pct": 5.353618222652509
+  },
+  "data": "G:\\GeoAI\\geonla_demo\\outputs\\raster_data.npz"
+}

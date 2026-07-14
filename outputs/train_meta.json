@@ -1,0 +1,7 @@
+{
+  "checkpoint": "G:\\GeoAI\\geonla_demo\\outputs\\geonla_model_checkpoint.pth",
+  "data": "G:\\GeoAI\\geonla_demo\\outputs\\synthetic_data.npz",
+  "best_val_loss": 0.0035663133952766658,
+  "final_train_loss": 0.005686567164957523,
+  "final_val_loss": 0.003613917110487819
+}
